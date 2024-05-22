@@ -203,6 +203,11 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
         torch.cuda.empty_cache()#使用 torch.cuda.empty_cache() 清理 GPU 内存。
 
 if __name__ == "__main__":
+    """
+    创建命令行参数解析器并添加一些命令行参数。
+ModelParams、OptimizationParams和PipelineParams用来设置模型、优化器和管道的参数。
+添加了一些额外的命令行参数，比如IP地址、端口、调试起点、检测异常、测试迭代次数、保存迭代次数、检查点迭代次数和开始检查点路径。"""
+    
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     lp = ModelParams(parser)
