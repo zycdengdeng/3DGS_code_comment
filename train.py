@@ -30,6 +30,16 @@ except ImportError:
 
 #主函数
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+    """
+    dataset：包含训练数据集的信息。
+opt：优化器参数。
+pipe：管道参数。
+testing_iterations：在这些迭代次数下进行模型测试。
+saving_iterations：在这些迭代次数下保存模型。
+checkpoint_iterations：在这些迭代次数下保存检查点。
+checkpoint：用于恢复训练的检查点路径。
+debug_from：从这个迭代次数开始进入调试模式。
+"""
     first_iter = 0 #初始化迭代次数。
     tb_writer = prepare_output_and_logger(dataset)  #设置 TensorBoard 写入器和日志记录器。
     gaussians = GaussianModel(dataset.sh_degree) #（重点看，需要转跳）创建一个 GaussianModel 类的实例，输入一系列参数，其参数取自数据集。
@@ -106,7 +116,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if iteration == opt.iterations:
                 progress_bar.close()
 
-            # Log and save
+            # Log and save 
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             if (iteration in saving_iterations): #如果达到保存迭代次数，保存场景。
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -228,6 +238,7 @@ ModelParams、OptimizationParams和PipelineParams用来设置模型、优化器�
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)
+    #目的就是为了在执行过程中控制标准输出的行为，添加时间戳并在需要时禁止输出
     safe_state(args.quiet)
 
     # Start GUI server, configure and run training
