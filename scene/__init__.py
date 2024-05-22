@@ -19,6 +19,15 @@ from arguments import ModelParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
 
 class Scene:
+     """
+        初始化场景对象
+
+        :param args: 包含模型路径和源路径等模型参数
+        :param gaussians: 高斯模型对象，用于场景点的3D表示
+        :param load_iteration: 指定加载模型的迭代次数，如果为-1，则自动寻找最大迭代次数
+        :param shuffle: 是否在训练前打乱相机列表
+        :param resolution_scales: 分辨率比例列表，用于处理不同分辨率的相机
+        """
 
     gaussians : GaussianModel
 
