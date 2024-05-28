@@ -12,12 +12,21 @@
 import torch
 import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
+#反sigmoid 就是把0-1再返回原始数据
+#生成指数学习率的，随时间减小
+#生产旋转矩阵，就可以控制物体的转动方向和角度
 from torch import nn
 import os
 from utils.system_utils import mkdir_p
+#创建目录的实用函数 简化文件夹管理
+
 from plyfile import PlyData, PlyElement
+#专门用于处理 PLY 文件格式
+#PLY（Polygon File Format 或 Stanford Triangle Format）是一种用于表示三维模型数据的文件格式，常用于存储从3D扫描仪获得的三维数据。
 from utils.sh_utils import RGB2SH
+#用于将 RGB 颜色空间数据转换为球谐函数系数的函数。
 from simple_knn._C import distCUDA2
+#distCUDA2 是一个使用 CUDA 加速计算的函数，用于计算两个集合之间的距离。
 from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation
 
