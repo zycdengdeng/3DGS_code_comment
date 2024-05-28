@@ -17,13 +17,13 @@ from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
 from utils.general_utils import safe_state
-import uuid
+import uuid  #导入了 uuid 模块，用于生成唯一的标识符
 from tqdm import tqdm
 from utils.image_utils import psnr
-from argparse import ArgumentParser, Namespace
-from arguments import ModelParams, PipelineParams, OptimizationParams
+from argparse import ArgumentParser, Namespace #解析命令行参数
+from arguments import ModelParams, PipelineParams, OptimizationParams #用于处理模型、管道和优化的参数。
 try:
-    from torch.utils.tensorboard import SummaryWriter
+    from torch.utils.tensorboard import SummaryWriter #用于记录和可视化训练过程
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
@@ -31,7 +31,7 @@ except ImportError:
 #主函数
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     """
-    dataset：包含训练数据集的信息。
+dataset：包含训练数据集的信息。
 opt：优化器参数。
 pipe：管道参数。
 testing_iterations：在这些迭代次数下进行模型测试。
