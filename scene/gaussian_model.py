@@ -28,17 +28,20 @@ from utils.sh_utils import RGB2SH
 from simple_knn._C import distCUDA2
 #distCUDA2 是一个使用 CUDA 加速计算的函数，用于计算两个集合之间的距离。
 from utils.graphics_utils import BasicPointCloud
+#加载，操作，可视化点云数据
 from utils.general_utils import strip_symmetric, build_scaling_rotation
-
+#它可能用于提取对称矩阵的特定部分或简化对称数据的处理
+#这个函数可能是用于构建包含缩放和旋转变换的矩阵。
 class GaussianModel:
 
-    def setup_functions(self): #用于设置一些激活函数和变换函数
+    def setup_functions(self): #用于设置一些激活函数和变换函数  这一步就是配置工具
         def build_covariance_from_scaling_rotation(scaling, scaling_modifier, rotation):#构建协方差矩阵，该函数接受 scaling（尺度）、scaling_modifier（尺度修正因子）、rotation（旋转）作为参数
             L = build_scaling_rotation(scaling_modifier * scaling, rotation)
-            actual_covariance = L @ L.transpose(1, 2)
-            symm = strip_symmetric(actual_covariance)
+            actual_covariance = L @ L.transpose(1, 2)   #乘转置
+            symm = strip_symmetric(actual_covariance)  #取上三角部分
             return symm #最终返回对称的协方差矩阵。
-        
+
+        #在神经网络中，激活函数（activation function）是用来对输入信号进行非线性变换的。
         self.scaling_activation = torch.exp #将尺度激活函数设置为指数函数。
         self.scaling_inverse_activation = torch.log #将尺度逆激活函数设置为对数函数。
 
@@ -47,7 +50,7 @@ class GaussianModel:
         self.opacity_activation = torch.sigmoid #将不透明度激活函数设置为 sigmoid 函数。
         self.inverse_opacity_activation = inverse_sigmoid #将不透明度逆激活函数设置为一个名为 inverse_sigmoid 的函数
 
-        self.rotation_activation = torch.nn.functional.normalize #用于归一化旋转矩阵。
+        self.rotation_activation = torch.nn.functional.normalize #用于归一化旋转矩阵，方向和原始tensor相同
 
 
     def __init__(self, sh_degree : int):
@@ -55,19 +58,20 @@ class GaussianModel:
         self.max_sh_degree = sh_degree   #最大球谐阶数
         # 存储不同信息的张量（tensor）
         self._xyz = torch.empty(0) #空间位置
-        self._features_dc = torch.empty(0)
+        self._features_dc = torch.empty(0) #存储特征数据
         self._features_rest = torch.empty(0)
-        self._scaling = torch.empty(0)  #椭球的形状尺度
+        self._scaling = torch.empty(0)  #椭球的形状尺度  半轴长度
         self._rotation = torch.empty(0) #椭球的旋转
         self._opacity = torch.empty(0)  #不透明度
-        self.max_radii2D = torch.empty(0)
-        self.xyz_gradient_accum = torch.empty(0)
-        self.denom = torch.empty(0)
+        self.max_radii2D = torch.empty(0) #最大半径
+        self.xyz_gradient_accum = torch.empty(0) #位置梯度
+        self.denom = torch.empty(0)  #需要的分母数据
         self.optimizer = None  #初始化优化器为 None。
         self.percent_dense = 0  #初始化百分比密度为0。
         self.spatial_lr_scale = 0 #初始化空间学习速率缩放为0。
         self.setup_functions() #调用 setup_functions 方法设置各种激活和变换函数
-
+        
+    #捕获当前对象的状态
     def capture(self):
         return (
             self.active_sh_degree,
@@ -97,6 +101,7 @@ class GaussianModel:
         denom,
         opt_dict, 
         self.spatial_lr_scale) = model_args
+        
         self.training_setup(training_args)
         self.xyz_gradient_accum = xyz_gradient_accum
         self.denom = denom
@@ -133,21 +138,21 @@ class GaussianModel:
 
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float): #用于从给定的点云数据 pcd 创建对象的初始化状态。
         self.spatial_lr_scale = spatial_lr_scale
-        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda() #转换点云数据为浮点型 CUDA 张量
         fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
-        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()#三个维度的张量大小
         features[:, :3, 0 ] = fused_color
         features[:, 3:, 1:] = 0.0
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
-
+    #clamp_min 是 PyTorch 中的一个内置函数，用于将张量中的最小值限制在一个指定的值之上
         dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
         rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
         rots[:, 0] = 1
-
+    #初始化不透明度张量
         opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
-
+#我们把点的位置（x, y, z）变成模型的可训练参数
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
         self._features_dc = nn.Parameter(features[:,:,0:1].transpose(1, 2).contiguous().requires_grad_(True))
         self._features_rest = nn.Parameter(features[:,:,1:].transpose(1, 2).contiguous().requires_grad_(True))
@@ -155,12 +160,13 @@ class GaussianModel:
         self._rotation = nn.Parameter(rots.requires_grad_(True))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
-
+#为训练过程做准备
     def training_setup(self, training_args):
+        #初始化训练参数
         self.percent_dense = training_args.percent_dense
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-
+#优化器参数列表：定义了需要优化的参数、对应的初始学习率和名称。
         l = [
             {'params': [self._xyz], 'lr': training_args.position_lr_init * self.spatial_lr_scale, "name": "xyz"},
             {'params': [self._features_dc], 'lr': training_args.feature_lr, "name": "f_dc"},
