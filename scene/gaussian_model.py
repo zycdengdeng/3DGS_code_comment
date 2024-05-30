@@ -1,15 +1,18 @@
-#
-# Copyright (C) 2023, Inria
-# GRAPHDECO research group, https://team.inria.fr/graphdeco
-# All rights reserved.
-#
-# This software is free for non-commercial, research and evaluation use 
-# under the terms of the LICENSE.md file.
-#
-# For inquiries contact  george.drettakis@inria.fr
-#
-
-import torch
+"""
+高斯model的基本框架：
+1.导入必要的模块和函数
+这些模块和函数主要用于数学运算、点云数据处理和文件操作等。
+2.类初始化和设置函数
+__init__ 方法初始化模型的基本参数和张量，并调用 setup_functions 方法设置各种激活和变换函数。
+3.捕获和恢复模型状态
+提供保存和恢复模型状态的方法，以便模型的持久化和继续训练。
+4.创建模型参数
+从给定的点云数据初始化模型的参数，包括位置、颜色、特征、尺度、旋转和不透明度等。
+4.设置训练参数
+设置训练过程中的参数，包括初始化学习率、优化器和学习率调度器。
+5. 其他辅助方法
+包括调整球谐函数阶数、获取模型参数、保存和加载点云文件等辅助功能。
+"""
 import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
 #反sigmoid 就是把0-1再返回原始数据
@@ -190,7 +193,7 @@ class GaussianModel:
                 param_group['lr'] = lr
                 return lr
 
-    def construct_list_of_attributes(self):
+    def construct_list_of_attributes(self):# 构建属性列表
         l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
         # All channels except the 3 DC
         for i in range(self._features_dc.shape[1]*self._features_dc.shape[2]):
@@ -204,7 +207,7 @@ class GaussianModel:
             l.append('rot_{}'.format(i))
         return l
 
-    def save_ply(self, path):
+    def save_ply(self, path): #保存为 PLY 文件
         mkdir_p(os.path.dirname(path))
 
         xyz = self._xyz.detach().cpu().numpy()
@@ -223,7 +226,7 @@ class GaussianModel:
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
 
-    def reset_opacity(self):
+    def reset_opacity(self):#重置不透明度 
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity)*0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
         self._opacity = optimizable_tensors["opacity"]
@@ -271,7 +274,7 @@ class GaussianModel:
 
         self.active_sh_degree = self.max_sh_degree
 
-    def replace_tensor_to_optimizer(self, tensor, name):
+    def replace_tensor_to_optimizer(self, tensor, name): #替换优化器中的张量
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
             if group["name"] == name:
@@ -286,7 +289,7 @@ class GaussianModel:
                 optimizable_tensors[group["name"]] = group["params"][0]
         return optimizable_tensors
 
-    def _prune_optimizer(self, mask):
+    def _prune_optimizer(self, mask):#修剪优化器中的张量
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
             stored_state = self.optimizer.state.get(group['params'][0], None)
